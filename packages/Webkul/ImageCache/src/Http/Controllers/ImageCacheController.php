@@ -6,8 +6,10 @@ use Closure;
 use Exception;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Cache;
 use Webkul\Core\Helpers\InstalledPackages;
 use Webkul\ImageCache\TemplateRegistry;
+use Webkul\User\Repositories\AdminRepository;
 
 class ImageCacheController extends Controller
 {
@@ -15,6 +17,30 @@ class ImageCacheController extends Controller
      * The Bagisto logo URL.
      */
     protected const BAGISTO_LOGO = 'https://updates.bagisto.com/bagisto.png';
+
+    /**
+     * The cache key remembering that the Bagisto logo could not be fetched.
+     */
+    protected const LOGO_UNREACHABLE_KEY = 'imagecache.logo-unreachable';
+
+    /**
+     * How long a failed fetch of the Bagisto logo is remembered, so a store that cannot reach the update
+     * server does not try again on every admin page.
+     */
+    protected const LOGO_RETRY_MINUTES = 10;
+
+    /**
+     * Seconds a remote fetch may wait, so an unreachable host cannot hold a worker.
+     */
+    protected const FETCH_TIMEOUT = 3;
+
+    /**
+     * The image types the cache serves, so a stored file whose bytes read as anything else is never sent from the store.
+     */
+    protected const SERVABLE_MIME_TYPES = [
+        'image/avif', 'image/bmp', 'image/gif', 'image/jpeg', 'image/png', 'image/vnd.microsoft.icon', 'image/webp',
+        'image/x-icon', 'image/x-ms-bmp',
+    ];
 
     /**
      * The current cache template name.
@@ -92,11 +118,17 @@ class ImageCacheController extends Controller
      */
     protected function getLogo(): Response
     {
+        if (Cache::has(self::LOGO_UNREACHABLE_KEY)) {
+            abort(404, 'Unable to fetch logo.');
+        }
+
         try {
             $content = $this->fetchFromUrl($this->getLogoUrl());
 
             return $this->buildResponse($content);
         } catch (Exception) {
+            Cache::put(self::LOGO_UNREACHABLE_KEY, true, now()->addMinutes(self::LOGO_RETRY_MINUTES));
+
             abort(404, 'Unable to fetch logo.');
         }
     }
@@ -131,8 +163,10 @@ class ImageCacheController extends Controller
             'http' => [
                 'method' => 'GET',
                 'protocol_version' => 1.1,
+                'timeout' => self::FETCH_TIMEOUT,
                 'header' => "Accept-language: en\r\n".
                     "Domain: $domain\r\n".
+                    $this->getAdminHeaders().
                     "User-Agent: Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36\r\n",
             ],
         ];
@@ -146,6 +180,22 @@ class ImageCacheController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Header lines naming the installer's admin, the lowest id, url encoded so that no
+     * name can break the header block.
+     */
+    protected function getAdminHeaders(): string
+    {
+        $admin = app(AdminRepository::class)->orderBy('id')->first();
+
+        if (! $admin) {
+            return '';
+        }
+
+        return 'Admin-Name: '.rawurlencode((string) $admin->name)."\r\n".
+            'Admin-Email: '.rawurlencode((string) $admin->email)."\r\n";
     }
 
     /**
@@ -279,11 +329,15 @@ class ImageCacheController extends Controller
     }
 
     /**
-     * Build the HTTP response with the image content.
+     * Build the HTTP response with the image content, refusing content that is not a servable image.
      */
     protected function buildResponse(string $content): Response
     {
         $mime = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $content);
+
+        if (! in_array($mime, self::SERVABLE_MIME_TYPES)) {
+            abort(404, 'Image not found.');
+        }
 
         $eTag = md5($content);
 
@@ -299,7 +353,9 @@ class ImageCacheController extends Controller
             'Content-Type' => $mime,
             'Cache-Control' => 'max-age='.$maxAge.', public',
             'Content-Length' => strlen($content),
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; sandbox",
             'Etag' => $eTag,
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 }

@@ -76,14 +76,7 @@ class Cart
                 'is_active' => 1,
             ]);
         } elseif (session()->has('cart')) {
-            $cart = $this->cartRepository->find(session()->get('cart')->id);
-
-            if (
-                $cart
-                && $cart->is_active
-            ) {
-                $this->cart = $cart;
-            }
+            $this->cart = $this->sessionCart();
         }
     }
 
@@ -214,7 +207,7 @@ class Cart
      */
     public function mergeCart(CustomerContract $customer): void
     {
-        if (! session()->has('cart')) {
+        if (! $guestCart = $this->sessionCart()) {
             return;
         }
 
@@ -222,8 +215,6 @@ class Cart
             'customer_id' => $customer->id,
             'is_active' => 1,
         ]);
-
-        $guestCart = $this->cartRepository->find(session()->get('cart')->id);
 
         if (! $cart) {
             $this->cartRepository->update([
@@ -311,6 +302,8 @@ class Cart
             }
         }
 
+        Shipping::removeAllShippingRates();
+
         $this->collectTotals();
 
         Event::dispatch('checkout.cart.add.after', $this->cart);
@@ -368,6 +361,10 @@ class Cart
                 throw new \Exception(trans('shop::app.checkout.cart.illegal'));
             }
 
+            if (! $item->getTypeInstance()->showQuantityBox()) {
+                $quantity = 1;
+            }
+
             $item->quantity = $quantity;
 
             if (! $this->isItemHaveQuantity($item)) {
@@ -392,6 +389,8 @@ class Cart
 
             Event::dispatch('checkout.cart.update.after', $item);
         }
+
+        Shipping::removeAllShippingRates();
 
         $this->collectTotals();
 
@@ -438,6 +437,26 @@ class Cart
     }
 
     /**
+     * The saved address a cart address was filled from, when it belongs to this cart's customer.
+     */
+    public function customerAddressId(array $params): ?int
+    {
+        if (
+            ($params['address_type'] ?? '') !== 'customer'
+            || empty($params['id'])
+            || ! $this->cart->customer_id
+        ) {
+            return null;
+        }
+
+        $address = $this->customerAddressRepository->find($params['id']);
+
+        return $address?->customer_id === $this->cart->customer_id
+            ? $address->id
+            : null;
+    }
+
+    /**
      * Update or create billing address.
      */
     public function updateOrCreateBillingAddress(array $params): CartAddressContract
@@ -460,7 +479,7 @@ class Cart
             ])
             ->merge([
                 'address_type' => CartAddress::ADDRESS_TYPE_BILLING,
-                'parent_address_id' => ($params['address_type'] ?? '') == 'customer' ? $params['id'] : null,
+                'parent_address_id' => $this->customerAddressId($params),
                 'cart_id' => $this->cart->id,
                 'customer_id' => $this->cart->customer_id,
                 'address' => implode(PHP_EOL, $params['address']),
@@ -524,7 +543,7 @@ class Cart
                 ->only($fillableFields)
                 ->merge([
                     'address_type' => CartAddress::ADDRESS_TYPE_SHIPPING,
-                    'parent_address_id' => ($params['address_type'] ?? '') == 'customer' ? $params['id'] : null,
+                    'parent_address_id' => $this->customerAddressId($params),
                     'cart_id' => $this->cart->id,
                     'customer_id' => $this->cart->customer_id,
                     'address' => implode(PHP_EOL, $params['address']),
@@ -788,22 +807,34 @@ class Cart
     }
 
     /**
-     * Check minimum Order Amount of cart.
+     * Whether the shopper has to sign in before this cart can be checked out: a guest does when guest
+     * checkout is off, the cart has gone, or it holds a downloadable or a product that needs an account.
+     */
+    public function requiresSignInToCheckout(): bool
+    {
+        if (auth()->guard('customer')->check()) {
+            return false;
+        }
+
+        return ! core()->getConfigData('sales.checkout.shopping_cart.allow_guest_checkout')
+            || ! $this->cart
+            || $this->cart->hasDownloadableItems()
+            || ! $this->cart->hasGuestCheckoutItems();
+    }
+
+    /**
+     * The cart amount the minimum-order rule is measured against.
      */
     public function getOrderAmount(): int
     {
         $minimumOrderAmount = $this->cart->sub_total;
 
-        if (core()->getConfigData('sales.order_settings.minimum_order.include_tax_to_amount')) {
-            $minimumOrderAmount += $this->cart->tax_total;
+        if (core()->getConfigData('sales.order_settings.minimum_order.include_discount_amount')) {
+            return $minimumOrderAmount - $this->cart->discount_amount;
         }
 
-        if (core()->getConfigData('sales.order_settings.minimum_order.include_discount_amount')) {
-            $minimumOrderAmount -= $this->cart->tax_total;
-
-            if ($this->cart->discount_amount) {
-                $minimumOrderAmount -= $this->cart->discount_amount;
-            }
+        if (core()->getConfigData('sales.order_settings.minimum_order.include_tax_to_amount')) {
+            $minimumOrderAmount += $this->cart->tax_total;
         }
 
         return $minimumOrderAmount;
@@ -985,7 +1016,7 @@ class Cart
                  * Update the item price if exchange rates changes with exclusive price is enabled.
                  */
                 if ($price != $item->price) {
-                    $item = $this->cartItemRepository->update([
+                    $item->update([
                         'price' => $price,
                         'price_incl_tax' => $price,
                         'base_price' => $basePrice,
@@ -994,7 +1025,7 @@ class Cart
                         'total_incl_tax' => $total,
                         'base_total' => ($baseTotal = $basePrice * $item->quantity),
                         'base_total_incl_tax' => $baseTotal,
-                    ], $item->id);
+                    ]);
 
                     $this->cart->items->put($key, $item);
                 }
@@ -1020,17 +1051,11 @@ class Cart
         $taxCategories = [];
 
         foreach ($this->cart->items as $key => $item) {
-            $taxCategoryId = $item->tax_category_id;
+            $taxCategoryId = $this->itemTaxCategoryId($item);
 
-            if (empty($taxCategoryId)) {
-                $taxCategoryId = $item->product->tax_category_id;
-            }
+            if (! $taxCategoryId) {
+                $this->untaxItem($item);
 
-            if (empty($taxCategoryId)) {
-                $taxCategoryId = core()->getConfigData('sales.taxes.categories.product');
-            }
-
-            if (empty($taxCategoryId)) {
                 continue;
             }
 
@@ -1039,6 +1064,8 @@ class Cart
             }
 
             if (! $taxCategories[$taxCategoryId]) {
+                $this->untaxItem($item);
+
                 continue;
             }
 
@@ -1159,10 +1186,16 @@ class Cart
         }
 
         if (! $taxCategoryId = core()->getConfigData('sales.taxes.categories.shipping')) {
+            $this->untaxShippingRate($shippingRate);
+
             return;
         }
 
-        $taxCategory = $this->taxCategoryRepository->find($taxCategoryId);
+        if (! $taxCategory = $this->taxCategoryRepository->find($taxCategoryId)) {
+            $this->untaxShippingRate($shippingRate);
+
+            return;
+        }
 
         $calculationBasedOn = core()->getConfigData('sales.taxes.calculation.based_on');
 
@@ -1189,6 +1222,10 @@ class Cart
         }
 
         Event::dispatch('checkout.cart.calculate.shipping.tax.before', $this->cart);
+
+        $shippingRate->applied_tax_rate = null;
+
+        $shippingRate->tax_percent = $shippingRate->tax_amount = $shippingRate->base_tax_amount = 0;
 
         Tax::isTaxApplicableInCurrentAddress($taxCategory, $address, function ($rate) use ($shippingRate) {
             $shippingRate->applied_tax_rate = $rate->identifier;
@@ -1242,5 +1279,118 @@ class Cart
         $shippingRate->save();
 
         Event::dispatch('checkout.cart.calculate.shipping.tax.after', $this->cart);
+    }
+
+    /**
+     * The guest cart the session key names, forgetting a key that no longer names a live one of
+     * their own so a dead key heals on the request that meets it.
+     */
+    protected function sessionCart(): ?Contracts\Cart
+    {
+        $sessionCart = session()->get('cart');
+
+        if (isset($sessionCart->id)) {
+            $cart = $this->cartRepository->find($sessionCart->id);
+
+            if (
+                $cart
+                && $cart->is_active
+                && ! $cart->customer_id
+            ) {
+                return $cart;
+            }
+        }
+
+        session()->forget('cart');
+
+        return null;
+    }
+
+    /**
+     * The tax category an item is taxed under — the first of the item's, its product's and the
+     * store's that still resolves, so a deleted one falls through rather than untaxing the item.
+     */
+    protected function itemTaxCategoryId(Contracts\CartItem $item): ?int
+    {
+        $candidates = [
+            $item->tax_category_id,
+            $item->product->tax_category_id,
+            core()->getConfigData('sales.taxes.categories.product'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (
+                $candidate
+                && $this->taxCategoryRepository->find($candidate)
+            ) {
+                return (int) $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Take the tax back off an item the configured categories no longer resolve, leaving an
+     * untouched one alone rather than writing a no-op on every pass.
+     */
+    protected function untaxItem(Contracts\CartItem $item): void
+    {
+        if (
+            empty($item->applied_tax_rate)
+            && empty((float) $item->tax_amount)
+        ) {
+            return;
+        }
+
+        $item->applied_tax_rate = null;
+
+        $item->tax_percent = $item->tax_amount = $item->base_tax_amount = 0;
+
+        if (Tax::isInclusiveTaxProductPrices()) {
+            $item->price = $item->price_incl_tax;
+            $item->base_price = $item->base_price_incl_tax;
+
+            $item->total = $item->total_incl_tax;
+            $item->base_total = $item->base_total_incl_tax;
+        } else {
+            $item->price_incl_tax = $item->price;
+            $item->base_price_incl_tax = $item->base_price;
+
+            $item->total_incl_tax = $item->total;
+            $item->base_total_incl_tax = $item->base_total;
+        }
+
+        $item->save();
+    }
+
+    /**
+     * Take the tax back off a shipping rate the configured category no longer resolves, leaving an
+     * untouched one alone rather than writing a no-op on every pass.
+     */
+    protected function untaxShippingRate(Contracts\CartShippingRate $shippingRate): void
+    {
+        if (
+            empty($shippingRate->applied_tax_rate)
+            && empty((float) $shippingRate->tax_amount)
+        ) {
+            return;
+        }
+
+        $shippingRate->applied_tax_rate = null;
+
+        $shippingRate->tax_percent = $shippingRate->tax_amount = $shippingRate->base_tax_amount = 0;
+
+        if (Tax::isInclusiveTaxShippingPrices()) {
+            $shippingRate->price = $shippingRate->price_incl_tax;
+
+            $shippingRate->base_price = $shippingRate->base_price_incl_tax;
+        } else {
+            $shippingRate->price_incl_tax = $shippingRate->price;
+
+            $shippingRate->base_price_incl_tax = $shippingRate->base_price;
+        }
+
+        $shippingRate->save();
     }
 }

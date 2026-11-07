@@ -176,6 +176,39 @@ class RazorpayPayment extends Payment
     }
 
     /**
+     * Fetch a payment from Razorpay, so what was actually paid can be checked.
+     *
+     * @return array{order_id: string|null, amount: int|null, currency: string|null, status: string|null}|null
+     */
+    public function fetchPayment(string $paymentId): ?array
+    {
+        try {
+            $payment = $this->getApi()->payment->fetch($paymentId);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+
+        return [
+            'order_id' => $payment->order_id ?? null,
+            'amount' => isset($payment->amount) ? (int) $payment->amount : null,
+            'currency' => $payment->currency ?? null,
+            'status' => $payment->status ?? null,
+        ];
+    }
+
+    /**
+     * Get a cart's grand total in the currency's smallest unit, which is what Razorpay charges in.
+     *
+     * @param  \Webkul\Checkout\Contracts\Cart  $cart
+     */
+    public function getAmountInSubunits($cart): int
+    {
+        return (int) round($cart->base_grand_total * 100);
+    }
+
+    /**
      * Create Razorpay order.
      *
      * @param  \Webkul\Checkout\Contracts\Cart|null  $cart
@@ -201,7 +234,7 @@ class RazorpayPayment extends Payment
         $api = $this->getApi();
 
         return $api->order->create([
-            'amount' => (int) ($cart->base_grand_total * 100),
+            'amount' => $this->getAmountInSubunits($cart),
             'currency' => $currency,
             'receipt' => self::RECEIPT_PREFIX.$cart->id,
             'payment_capture' => 1,
@@ -222,7 +255,7 @@ class RazorpayPayment extends Payment
     {
         return [
             'key' => $this->getApiKey(),
-            'amount' => (int) ($cart->base_grand_total * 100),
+            'amount' => $this->getAmountInSubunits($cart),
             'currency' => strtoupper($cart->base_currency_code ?? core()->getBaseCurrencyCode()),
             'name' => $this->getMerchantName(),
             'description' => $this->getMerchantDescription(),

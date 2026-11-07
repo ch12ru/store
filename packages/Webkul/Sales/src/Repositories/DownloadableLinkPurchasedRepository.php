@@ -3,8 +3,10 @@
 namespace Webkul\Sales\Repositories;
 
 use Illuminate\Container\Container;
+use Illuminate\Support\Facades\DB;
 use Webkul\Core\Eloquent\Repository;
 use Webkul\Product\Repositories\ProductDownloadableLinkRepository;
+use Webkul\Sales\Contracts\DownloadableLinkPurchased;
 use Webkul\Sales\Contracts\OrderItem;
 
 class DownloadableLinkPurchasedRepository extends Repository
@@ -79,33 +81,140 @@ class DownloadableLinkPurchasedRepository extends Repository
         $purchasedLinks = $this->findByField('order_item_id', $orderItem->id);
 
         foreach ($purchasedLinks as $purchasedLink) {
-            if ($status == 'expired') {
-                if (count($purchasedLink->order_item->invoice_items) > 0) {
-                    $totalInvoiceQty = 0;
-
-                    foreach ($purchasedLink->order_item->invoice_items as $invoice_item) {
-                        $totalInvoiceQty = $totalInvoiceQty + $invoice_item->qty;
-                    }
-
-                    $orderedQty = $purchasedLink->order_item->qty_ordered;
-                    $totalInvoiceQty = $totalInvoiceQty * ($purchasedLink->download_bought / $orderedQty);
-
-                    $this->update([
-                        'status' => $purchasedLink->download_used == $totalInvoiceQty ? $status : $purchasedLink->status,
-                        'download_canceled' => $purchasedLink->download_bought - $totalInvoiceQty,
-                    ], $purchasedLink->id);
-                } else {
-                    $this->update([
-                        'status' => $status,
-                        'download_canceled' => $purchasedLink->download_bought,
-                    ], $purchasedLink->id);
-                }
-            } else {
+            if ($status != 'expired') {
                 $this->update([
                     'status' => $status,
                 ], $purchasedLink->id);
+
+                continue;
             }
+
+            if ($this->keepsPaidDownloads($purchasedLink)) {
+                $this->update([
+                    'download_canceled' => $this->getUninvoicedDownloads($purchasedLink),
+                ], $purchasedLink->id);
+
+                continue;
+            }
+
+            $this->update([
+                'status' => $status,
+                'download_canceled' => $this->getRevokedDownloads($purchasedLink),
+            ], $purchasedLink->id);
         }
+    }
+
+    /**
+     * Spend one of the purchased link's downloads, under a row lock so that concurrent requests
+     * cannot each spend the same one.
+     */
+    public function consumeDownload(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $purchasedLink = $this->getModel()
+                ->newQuery()
+                ->lockForUpdate()
+                ->find($id);
+
+            if (! $purchasedLink) {
+                return false;
+            }
+
+            if (! $this->hasUnlimitedDownloads($purchasedLink)) {
+                if ($purchasedLink->download_used >= $this->getInvoicedDownloads($purchasedLink)) {
+                    return false;
+                }
+
+                if ($this->getRemainingDownloads($purchasedLink) <= 0) {
+                    return false;
+                }
+            }
+
+            $purchasedLink->increment('download_used');
+
+            if (
+                ! $this->hasUnlimitedDownloads($purchasedLink)
+                && $this->getRemainingDownloads($purchasedLink) <= 0
+            ) {
+                $purchasedLink->update(['status' => 'expired']);
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * Does the purchased link carry no download limit at all? A link bought with no allowance
+     * recorded against it is unlimited, which is what a zero on the product's link means.
+     */
+    protected function hasUnlimitedDownloads(DownloadableLinkPurchased $purchasedLink): bool
+    {
+        return ! $purchasedLink->download_bought;
+    }
+
+    /**
+     * The downloads a revoked link gives up, which is whatever it had not already spent.
+     */
+    protected function getRevokedDownloads(DownloadableLinkPurchased $purchasedLink): int
+    {
+        if ($this->hasUnlimitedDownloads($purchasedLink)) {
+            return 0;
+        }
+
+        return max(0, $purchasedLink->download_bought - $purchasedLink->download_used);
+    }
+
+    /**
+     * Is part of the link's ordered item still paid for and kept, as when only the uninvoiced rest
+     * of an order is cancelled? Such a link keeps the downloads its invoiced share bought.
+     */
+    protected function keepsPaidDownloads(DownloadableLinkPurchased $purchasedLink): bool
+    {
+        $orderItem = $purchasedLink->order_item;
+
+        return $orderItem
+            && $orderItem->qty_invoiced > 0
+            && $orderItem->qty_ordered > $orderItem->qty_refunded + $orderItem->qty_canceled;
+    }
+
+    /**
+     * The downloads a link gives up when only the uninvoiced rest of its ordered item is cancelled.
+     */
+    protected function getUninvoicedDownloads(DownloadableLinkPurchased $purchasedLink): int
+    {
+        return (int) max(0, $purchasedLink->download_bought - $this->getInvoicedDownloads($purchasedLink));
+    }
+
+    /**
+     * The number of downloads the invoiced quantity of the link's own ordered item entitles the
+     * customer to, so a partly invoiced item grants only the share it has paid for.
+     */
+    protected function getInvoicedDownloads(DownloadableLinkPurchased $purchasedLink): float
+    {
+        $orderItem = $purchasedLink->order_item;
+
+        if (
+            ! $orderItem
+            || ! $orderItem->qty_ordered
+        ) {
+            return 0;
+        }
+
+        $invoicedQty = 0;
+
+        foreach ($orderItem->invoice_items as $invoiceItem) {
+            $invoicedQty = $invoicedQty + $invoiceItem->qty;
+        }
+
+        return $invoicedQty * ($purchasedLink->download_bought / $orderItem->qty_ordered);
+    }
+
+    /**
+     * The number of downloads left on the purchased link.
+     */
+    protected function getRemainingDownloads(DownloadableLinkPurchased $purchasedLink): int
+    {
+        return $purchasedLink->download_bought - ($purchasedLink->download_used + $purchasedLink->download_canceled);
     }
 
     /**

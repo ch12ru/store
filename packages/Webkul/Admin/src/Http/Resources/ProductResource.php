@@ -21,12 +21,13 @@ class ProductResource extends JsonResource
             'sku' => $this->sku,
             'name' => $this->name,
             'price' => $this->price,
-            'formatted_price' => core()->formatPrice($this->price),
+            'formatted_price' => core()->formatBasePrice($this->price),
             'images' => $this->images,
             'inventories' => $this->inventories,
             'qty_available' => $this->resolveAvailableQuantity(),
             'is_options_required' => ! $this->getTypeInstance()->canBeAddedToCartWithoutOptions(),
             'is_saleable' => $this->getTypeInstance()->isSaleable(),
+            'can_change_qty' => $this->getTypeInstance()->showQuantityBox(),
         ];
     }
 

@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Storage;
 use Webkul\Admin\Tests\AdminTestCase;
 use Webkul\Core\Tests\CoreTestCase;
 use Webkul\Customer\Tests\CustomerTestCase;
@@ -9,6 +10,7 @@ use Webkul\FPC\Tests\FPCTestCase;
 use Webkul\Installer\Tests\InstallerTestCase;
 use Webkul\PayGlocal\Tests\PayGlocalTestCase;
 use Webkul\Payment\Tests\PaymentTestCase;
+use Webkul\Paypal\Tests\PaypalTestCase;
 use Webkul\PayU\Tests\PayUTestCase;
 use Webkul\Razorpay\Tests\RazorpayTestCase;
 use Webkul\Shop\Tests\ShopTestCase;
@@ -36,10 +38,24 @@ uses(FPCTestCase::class)->in('../packages/Webkul/FPC/tests');
 uses(InstallerTestCase::class)->in('../packages/Webkul/Installer/tests');
 uses(PayGlocalTestCase::class)->in('../packages/Webkul/PayGlocal/tests');
 uses(PaymentTestCase::class)->in('../packages/Webkul/Payment/tests');
+uses(PaypalTestCase::class)->in('../packages/Webkul/Paypal/tests');
 uses(PayUTestCase::class)->in('../packages/Webkul/PayU/tests');
 uses(RazorpayTestCase::class)->in('../packages/Webkul/Razorpay/tests');
 uses(ShopTestCase::class)->in('../packages/Webkul/Shop/tests');
 uses(StripeTestCase::class)->in('../packages/Webkul/Stripe/tests');
+
+/*
+|--------------------------------------------------------------------------
+| Storage Isolation
+|--------------------------------------------------------------------------
+|
+| Editing or removing a theme section deletes its uploads from the disk, and a rolled back
+| transaction does not put a deleted file back. The screens that do it work on a temporary
+| disk, so a run against a developer's own database leaves that store's media alone.
+|
+*/
+
+uses()->beforeEach(fn () => Storage::fake())->in('../packages/Webkul/Admin/tests/Feature/Appearance');
 
 /*
 |--------------------------------------------------------------------------

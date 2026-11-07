@@ -2,6 +2,120 @@
 
 This changelog consists of the bug & security fixes and new features being included in the releases listed below.
 
+## Unreleased
+
+- Soon.
+
+## **v2.4.14 (3rd of November 2026)** - *Release*
+
+- Security fixes.
+
+- Fixed admin order creation offering a quantity for products that take none, such as downloadable products.
+
+- Fixed a downloadable link set to unlimited downloads never downloading, and the admin form refusing 0 as the unlimited value.
+
+- Fixed a fully refunded downloadable link staying downloadable.
+
+- Fixed a downloadable link bought alongside other products being short of downloads until the whole order was invoiced.
+
+- Fixed a downloadable product's quantity being raised by adding it again or through the API, which multiplied its price and its downloads.
+
+- Fixed overdue invoice reminders being sent to the store's own sender address instead of the customer who placed the order.
+
+- Fixed the header menu keeping the previous language or channel after switching on any page but the home page.
+
+- Fixed Stripe Checkout rejecting an order in a zero-decimal currency such as JPY, or with a tax or shipping amount carrying a fraction of the smallest unit.
+
+- Fixed the minimum-order check subtracting tax that was never added, which refused carts above the minimum when the discount was included but tax was not.
+
+- Fixed a deleted tax category leaving its tax on carts, and a deleted shipping tax category failing every cart total.
+
+- Fixed a newly added base currency showing the wrong symbol in admin and in prices formatted in the browser, and a custom group and decimal separator being swapped.
+
+- Fixed admin cart, product and revenue prices using the channel's currency instead of the base currency, and the return request screens showing every price in US dollars.
+
+- Fixed the total due still counting cancelled items, or taking them off at the base price on an order in another currency, and the mobile order page giving each item the whole order's grand total.
+
+- Fixed the admin order, invoice, shipment and refund screens leaving the customer's name, company and VAT number blank. They now always print as plain text.
+
+- Fixed sending an invoice, refund or shipment email marking every invoice, refund or shipment in the store as emailed, rather than just the one sent.
+
+- Fixed the search terms and search synonyms mass delete being hidden from every role but one with full access, and the RMA request view action being hidden from a role without create permission.
+
+- Fixed cancelling an order of a configurable product leaving its variant's stock reserved, so those units stayed unsellable long after the order was gone.
+
+- Fixed a cancelled order keeping its stock reserved when inventory management had since been switched off for the product, which held the units back once it was switched on again.
+
+- Fixed a part invoiced or part refunded configurable product recording its variant line for the whole order rather than the quantity acted on, which also freed stock the order still owed.
+
+- Fixed every JSON 500 response describing itself with an unresolvable translation key, so the client was handed the key instead of the message.
+
+- Fixed the installer naming the Venezuelan bolívar by its retired VEF code and its pre-redenomination symbol, while installing it as VES.
+
+- Added a `--force` option to `bagisto:install`, so an unattended install into a production environment proceeds instead of stopping at a confirmation nobody can answer.
+
+- #11558 [fixed] - Fixed the invoice PDF ignoring the footer text set under PDF Print Outs. It now prints centred below the totals, keeping its line breaks.
+
+- #11541 [fixed] - Fixed an expired or missing CSRF token coming back as a 500 rather than a 419 on a store with debug off, along with every other client error that has no page of its own, such as a throttled request's 429.
+
+- #11539 [fixed] - Fixed a cart rule set to apply to shipping losing its shipping discount whenever a shipping tax category was configured, so the shopper paid the full shipping price.
+
+- #11523 [fixed] - Fixed Razorpay creating its order a paisa short on totals such as ₹19.99 and then refusing that payment, so the shopper was charged and no order was placed.
+
+- #11522 [fixed] - Fixed a configurable product order reserving none of its variant's stock, so the same unit could be sold again until the order was shipped.
+
+- #11519 [fixed] - Fixed the admin transaction listing hiding its view action from a role with transaction permission, and showing it to a role with only shipment permission.
+
+- #11518 [fixed] - Fixed an unreadable SVG being stored as an empty file while the upload reported success, leaving a blank image. It is now refused with a message and no file is kept.
+
+## **v2.4.13 (6th of October 2026)** - *Release*
+
+- Fixed the invoice and shipment screens accepting an order item that belongs to a different order, which recorded the document against the wrong one. Every item named is now checked against the order being acted on.
+
+- Fixed a refund accepting any shipping amount, so a crafted request could refund far more than the order was charged. The amount is now limited to the shipping invoiced less what has already been refunded, as the form already showed.
+
+- Fixed a decimal cart quantity being stored rounded while the customer was billed the unrounded figure. The quantity now has to be a whole number, and zero still empties the line.
+
+- Fixed the customer addresses url answering with a server error. Addresses are managed on the customer's own screen, which the url now opens.
+
+- Fixed the admin notification feed handing every order's details — the customer's name and email address, the totals and the status — to any signed in admin, whatever their role allowed. The feed, the notification screen and the bell now follow the permission on orders.
+
+- Fixed a product page failing with a division by zero when the product and its customer group price are both set to zero. A free product now shows no discount rather than an error.
+
+- Fixed the seeded theme sections keeping their pictures in another section's directory, so deleting or editing one section removed the pictures of another.
+
+- Fixed cart rules starting and ending up to an hour early or late: their start and end times were compared with a time whose minutes were the current month (`H:m:s` instead of `H:i:s`).
+
+- Fixed Stripe charging the full price when a cart rule discounted the order. The discount now shows on Stripe's payment page, and a fractional unit price no longer loses a penny to rounding.
+
+- Automated security auditing and fixings.
+
+- #11516 [fixed] - Fixed a PayU payment the customer never returned from leaving no order behind, which an in-app browser made easy to hit. PayU's server to server notification now places it, once.
+
+- #11513 [fixed] - Fixed a generated sitemap being written so that only its owner could read it, which left the sitemap url answering with a not found error until the permissions were corrected by hand.
+
+- #11511 [fixed] - Fixed a phone number written the way people normally write one, such as `0412 345 678`, `(555) 123-4567` or `+44 20 7946 0958`, being rejected at checkout and on the address forms.
+
+- #11510 [fixed] - Fixed the customer address form discarding the typed postcode and the second and later street lines whenever it came back with a validation error.
+
+- #11509 [fixed] - Fixed the storefront copyright notice being shared by every channel. It is now set per channel as well as per locale, and a migration carries the stored notice over.
+
+- #11504 [fixed] - Fixed the account overview being titled and breadcrumbed as Orders, and the account menu's greeting and profile image description staying English in every locale.
+
+- #11503 [fixed] - Fixed the GDPR pages showing their 404 in the default theme rather than the channel's own, unlike every other storefront 404, while the feature is switched off.
+
+- #11501 [fixed] - Fixed a fatal error when publishing or previewing a Product Carousel section, as the Appearance editor named the channel by id where the rest of the application names it by code.
+
+## **v2.4.12 (22nd of September 2026)** - *Release*
+
+- Stripe now takes webhooks: a paid checkout becomes an order even when the customer never returns to the store, and refunds and disputes made in Stripe are recorded on the order. Set the signing secret in the Stripe payment method configuration.
+
+- Fixed saving a product showing a not found page after a customizable option was switched between a single-price type and a type with values, and a cancelled type change still being applied.
+
+- Fixed customizable options and values added after another was removed overwriting an existing one, and values left at a price of zero never being added.
+
+- Security fixes.
+
 ## **v2.4.11 (16th of September 2026)** - *Release*
 
 - Fixed the paragraph and heading dropdown missing from the rich text editor toolbar, which still named TinyMCE 5's `formatselect` control instead of TinyMCE 6's `blocks`.

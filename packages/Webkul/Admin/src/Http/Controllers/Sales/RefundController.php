@@ -69,12 +69,19 @@ class RefundController extends Controller
         $this->validate(request(), [
             'refund.items' => 'array',
             'refund.items.*' => 'required|numeric|min:0',
+            'refund.shipping' => 'sometimes|numeric|min:0|max:'.($order->base_shipping_invoiced - $order->base_shipping_refunded),
         ]);
 
         $data = request()->all();
 
         if (! isset($data['refund']['shipping'])) {
             $data['refund']['shipping'] = 0;
+        }
+
+        if (! $this->itemsBelongToOrder($order, array_keys((array) ($data['refund']['items'] ?? [])))) {
+            session()->flash('error', trans('admin::app.sales.refunds.create.invalid-qty'));
+
+            return redirect()->back();
         }
 
         try {
@@ -143,5 +150,16 @@ class RefundController extends Controller
         $refund = $this->refundRepository->findOrFail($id);
 
         return view('admin::sales.refunds.view', compact('refund'));
+    }
+
+    /**
+     * Whether every item the request names is one the order carries.
+     */
+    protected function itemsBelongToOrder($order, array $itemIds): bool
+    {
+        return ! array_diff(
+            array_map('intval', $itemIds),
+            $order->items->pluck('id')->map('intval')->all()
+        );
     }
 }

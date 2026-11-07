@@ -137,6 +137,24 @@ it('returns the current channel if the requested channel code is not provided', 
     expect($channel->code)->toBe($expectedChannel->code);
 });
 
+it('returns the current channel if the requested channel does not exist', function () {
+    // Arrange
+    $expectedChannel = Channel::factory()->create();
+
+    core()->setCurrentChannel($expectedChannel);
+
+    request()->merge([
+        'channel' => 'not-a-channel',
+    ]);
+
+    // Act
+    $channel = core()->getRequestedChannel();
+
+    // Assert
+    expect($channel->id)->toBe($expectedChannel->id);
+    expect(core()->getRequestedLocaleCodeInRequestedChannel())->toBe($expectedChannel->resolveLocaleCode(core()->getRequestedLocaleCode()));
+});
+
 it('returns the requested channel code', function () {
     // Arrange
     $expectedChannel = Channel::factory()->create();
@@ -715,4 +733,40 @@ it('should format the base price and place the code on the right side with space
 
     // Assert
     expect($formattedPrice)->toBe($price.' '.$indianCurrency->code);
+});
+
+it('should return the symbol saved for a currency code rather than the locale one', function () {
+    // Arrange
+    Currency::factory()->create([
+        'code' => 'XTB',
+        'symbol' => 'T#',
+    ]);
+
+    // Act and Assert
+    expect(core()->currencySymbol('XTB'))->toBe('T#');
+});
+
+it('should fall back to the locale symbol for a currency code with no saved symbol', function () {
+    // Arrange
+    Currency::factory()->create([
+        'code' => 'XTC',
+        'symbol' => '',
+    ]);
+
+    // Act and Assert
+    expect(core()->currencySymbol('XTC'))->toBe('XTC')
+        ->and(core()->currencySymbol('ZZZ'))->toBe('ZZZ');
+});
+
+it('should swap the group and decimal separators for the ones the currency sets without mixing them up', function () {
+    // Arrange
+    $currency = Currency::factory()->create([
+        'symbol' => '€',
+        'group_separator' => '.',
+        'decimal_separator' => ',',
+        'currency_position' => CurrencyPositionEnum::LEFT->value,
+    ]);
+
+    // Act and Assert
+    expect(core()->formatCurrency(1234.5, $currency))->toBe('€1.234,50');
 });

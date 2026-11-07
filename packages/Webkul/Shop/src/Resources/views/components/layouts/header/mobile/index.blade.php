@@ -284,7 +284,7 @@
                                     class="flex flex-col justify-between gap-2.5 max-md:gap-0"
                                     v-pre
                                 >
-                                    <p class="text-2xl break-all font-mediums max-md:text-xl">Hello! {{ auth()->user()?->first_name }}</p>
+                                    <p class="text-2xl break-all font-medium max-md:text-xl">{{ trans('shop::app.components.layouts.account.greeting', ['name' => auth()->user()?->first_name]) }}</p>
 
                                     <p class="no-underline text-zinc-500 max-md:text-sm">{{ auth()->user()?->email }}</p>
                                 </div>
@@ -512,7 +512,7 @@
             methods: {
                 initCategories() {
                     try {
-                        const stored = localStorage.getItem('categories');
+                        const stored = localStorage.getItem('categories:{{ core()->getCurrentChannelCode() }}:{{ app()->getLocale() }}');
 
                         if (stored) {
                             this.categories = JSON.parse(stored);
@@ -528,7 +528,7 @@
                     this.$axios.get("{{ route('shop.api.categories.tree') }}")
                         .then(response => {
                             this.categories = response.data.data;
-                            localStorage.setItem('categories', JSON.stringify(this.categories));
+                            localStorage.setItem('categories:{{ core()->getCurrentChannelCode() }}:{{ app()->getLocale() }}', JSON.stringify(this.categories));
                         })
                         .catch(error => {
                             console.log(error);

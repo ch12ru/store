@@ -1291,6 +1291,7 @@ return [
                                 'price' => '価格',
                                 'save-btn' => '保存',
                                 'supported-file-extensions' => 'サポートされているファイル拡張子',
+                                'supported-file-extensions-info' => '拡張子はカンマで区切って入力してください（例: jpg, png, pdf）。Web ページ、SVG 画像、XML ファイル、スクリプトファイルは、ここに記載しても受け付けられません。',
                                 'title' => 'オプション',
                                 'type' => 'タイプ',
                                 'yes' => 'はい',
@@ -5223,6 +5224,10 @@ return [
                     'test-client-secret' => 'テストモードクライアントシークレット',
                     'test-mode-info' => 'テスト/サンドボックスモードのみ。',
                     'title' => 'タイトル',
+                    'webhook-secret' => 'Webhook 署名シークレット',
+                    'webhook-secret-info' => 'Stripe ダッシュボードで、ストア URL に /stripe/webhook を付けて追加した Webhook エンドポイントの署名シークレット（イベント: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed）。 本番モードのみ適用されます。',
+                    'webhook-test-secret' => 'Webhook テスト署名シークレット',
+                    'webhook-test-secret-info' => 'Stripe ダッシュボードで、ストア URL に /stripe/webhook を付けて追加した Webhook エンドポイントの署名シークレット（イベント: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed）。 テストモードのみ適用されます。',
                 ],
 
                 'order-settings' => [

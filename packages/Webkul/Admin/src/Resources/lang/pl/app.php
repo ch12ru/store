@@ -1291,6 +1291,7 @@ return [
                                 'price' => 'Cena',
                                 'save-btn' => 'Zapisz',
                                 'supported-file-extensions' => 'Obsługiwane rozszerzenia plików',
+                                'supported-file-extensions-info' => 'Oddziel rozszerzenia przecinkami, na przykład jpg, png, pdf. Strony internetowe, obrazy SVG, pliki XML i skrypty nigdy nie są akceptowane, nawet jeśli zostaną tu wymienione.',
                                 'title' => 'Opcja',
                                 'type' => 'Typ',
                                 'yes' => 'Tak',
@@ -5223,6 +5224,10 @@ return [
                     'test-client-secret' => 'Sekret klienta w trybie testowym',
                     'test-mode-info' => 'Tylko dla trybu testowego/piaskownicy.',
                     'title' => 'Tytuł',
+                    'webhook-secret' => 'Sekret podpisu webhooka',
+                    'webhook-secret-info' => 'Sekret podpisu punktu webhooka dodanego w panelu Stripe dla adresu sklepu z dopiskiem /stripe/webhook, ze zdarzeniami: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed. Dotyczy tylko trybu produkcyjnego.',
+                    'webhook-test-secret' => 'Testowy sekret podpisu webhooka',
+                    'webhook-test-secret-info' => 'Sekret podpisu punktu webhooka dodanego w panelu Stripe dla adresu sklepu z dopiskiem /stripe/webhook, ze zdarzeniami: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed. Dotyczy tylko trybu testowego.',
                 ],
 
                 'order-settings' => [

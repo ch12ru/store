@@ -166,6 +166,11 @@ class CartController extends APIController
      */
     public function update(): JsonResource
     {
+        $this->validate(request(), [
+            'qty' => 'present|array',
+            'qty.*' => 'required|integer|min:0',
+        ]);
+
         try {
             Cart::updateItems(request()->input());
 
@@ -265,7 +270,7 @@ class CartController extends APIController
 
                 return (new JsonResource([
                     'data' => new CartResource(Cart::getCart()),
-                    'message' => trans('Coupon not found.'),
+                    'message' => trans('shop::app.checkout.coupon.apply-issue'),
                 ]))->response()->setStatusCode(Response::HTTP_UNPROCESSABLE_ENTITY);
             }
         } catch (\Exception $e) {

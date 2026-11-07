@@ -1291,6 +1291,7 @@ return [
                                 'price' => 'السعر',
                                 'save-btn' => 'حفظ',
                                 'supported-file-extensions' => 'الامتدادات المدعومة للملفات',
+                                'supported-file-extensions-info' => 'افصل الامتدادات بفواصل، مثل jpg, png, pdf. لا تُقبل صفحات الويب وصور SVG وملفات XML والبرامج النصية أبدًا، حتى لو أُدرجت هنا.',
                                 'title' => 'خيار',
                                 'type' => 'النوع',
                                 'yes' => 'نعم',
@@ -5223,6 +5224,10 @@ return [
                     'test-client-secret' => 'السر الخاص بالعميل لوضع الاختبار',
                     'test-mode-info' => 'لوضع الاختبار / الصندوق الرملي فقط.',
                     'title' => 'العنوان',
+                    'webhook-secret' => 'سر توقيع Webhook',
+                    'webhook-secret-info' => 'سر التوقيع لنقطة Webhook في لوحة تحكم Stripe لعنوان متجرك متبوعًا بـ /stripe/webhook، مع الأحداث: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed. ينطبق على وضع الإنتاج فقط.',
+                    'webhook-test-secret' => 'سر توقيع Webhook التجريبي',
+                    'webhook-test-secret-info' => 'سر التوقيع لنقطة Webhook في لوحة تحكم Stripe لعنوان متجرك متبوعًا بـ /stripe/webhook، مع الأحداث: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed. ينطبق على وضع الاختبار فقط.',
                 ],
 
                 'order-settings' => [

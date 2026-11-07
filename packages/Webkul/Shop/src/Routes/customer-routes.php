@@ -15,6 +15,7 @@ use Webkul\Shop\Http\Controllers\Customer\RegistrationController;
 use Webkul\Shop\Http\Controllers\Customer\ResetPasswordController;
 use Webkul\Shop\Http\Controllers\Customer\SessionController;
 use Webkul\Shop\Http\Controllers\DataGridController;
+use Webkul\Shop\Http\Middleware\EnsureGDPRIsEnabled;
 
 Route::prefix('customer')->group(function () {
     /**
@@ -23,7 +24,9 @@ Route::prefix('customer')->group(function () {
     Route::controller(ForgotPasswordController::class)->prefix('forgot-password')->group(function () {
         Route::get('', 'create')->name('shop.customers.forgot_password.create');
 
-        Route::post('', 'store')->name('shop.customers.forgot_password.store');
+        Route::post('', 'store')
+            ->middleware('throttle:6,1')
+            ->name('shop.customers.forgot_password.store');
     });
 
     /**
@@ -111,22 +114,26 @@ Route::prefix('customer')->group(function () {
             /**
              * GDPR.
              */
-            Route::controller(GDPRController::class)->prefix('gdpr')->group(function () {
-                Route::get('', 'index')->name('shop.customers.account.gdpr.index');
+            Route::controller(GDPRController::class)
+                ->prefix('gdpr')
+                ->middleware(EnsureGDPRIsEnabled::class)
+                ->group(function () {
+                    Route::get('', 'index')->name('shop.customers.account.gdpr.index');
 
-                Route::post('', 'store')->name('shop.customers.account.gdpr.store');
+                    Route::post('', 'store')->name('shop.customers.account.gdpr.store');
 
-                Route::get('pdf-view', 'pdfView')->name('shop.customers.account.gdpr.pdf-view');
+                    Route::get('pdf-view', 'pdfView')->name('shop.customers.account.gdpr.pdf-view');
 
-                Route::get('html-view', 'htmlView')->name('shop.customers.account.gdpr.html-view');
+                    Route::get('html-view', 'htmlView')->name('shop.customers.account.gdpr.html-view');
 
-                Route::post('revoke/{id}', 'revoke')->name('shop.customers.account.gdpr.revoke');
-            });
+                    Route::post('revoke/{id}', 'revoke')->name('shop.customers.account.gdpr.revoke');
+                });
 
             /**
              * Cookie consent.
              */
             Route::get('your-cookie-consent-preferences', [GDPRController::class, 'cookieConsent'])
+                ->middleware(EnsureGDPRIsEnabled::class)
                 ->name('shop.customers.gdpr.cookie-consent');
 
             /**

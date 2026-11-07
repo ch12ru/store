@@ -28,7 +28,7 @@ class Core
      *
      * @var string
      */
-    const BAGISTO_VERSION = '2.4.11';
+    const BAGISTO_VERSION = '2.4.x-dev';
 
     /**
      * Current Channel.
@@ -218,7 +218,7 @@ class Core
     }
 
     /**
-     * Get channel from request.
+     * Get channel from request, falling back to the current one when the request names a channel the store does not have.
      *
      * @return Contracts\Channel
      */
@@ -227,7 +227,7 @@ class Core
         $code = request()->query('channel');
 
         if ($code) {
-            return $this->channelRepository->findOneByField('code', $code);
+            return $this->channelRepository->findOneByField('code', $code) ?? $this->getCurrentChannel();
         }
 
         return $this->getCurrentChannel();

@@ -1291,6 +1291,7 @@ return [
                                 'price' => 'මිල',
                                 'save-btn' => 'සුරකින්න',
                                 'supported-file-extensions' => 'පහත දැක්වෙන ගොනු දිගු දැක්වේ',
+                                'supported-file-extensions-info' => 'දිගු කොමා මඟින් වෙන් කරන්න, උදාහරණයක් ලෙස jpg, png, pdf. වෙබ් පිටු, SVG රූප, XML සහ ස්ක්‍රිප්ට් ගොනු මෙහි සඳහන් කළද කිසි විටෙක පිළිගනු නොලැබේ.',
                                 'title' => 'විකල්පය',
                                 'type' => 'වර්ගය',
                                 'yes' => 'ඔව්',
@@ -5223,6 +5224,10 @@ return [
                     'test-client-secret' => 'පරීක්ෂණ මාදිලියේ අමතක රහස',
                     'test-mode-info' => 'පරීක්ෂණ/සැම්ප්ලින් මාදිලිය සඳහා පමණක්.',
                     'title' => 'මාතෘකාව',
+                    'webhook-secret' => 'Webhook අත්සන් රහස',
+                    'webhook-secret-info' => 'ඔබේ වෙළඳසැල් URL එකට /stripe/webhook එක් කර Stripe පාලන පුවරුවේ එක් කළ webhook අන්ත ලක්ෂ්‍යයේ අත්සන් රහස, මෙම සිදුවීම් සමඟ: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed. නිෂ්පාදන ප්‍රකාරයට පමණක් අදාළ වේ.',
+                    'webhook-test-secret' => 'Webhook පරීක්ෂණ අත්සන් රහස',
+                    'webhook-test-secret-info' => 'ඔබේ වෙළඳසැල් URL එකට /stripe/webhook එක් කර Stripe පාලන පුවරුවේ එක් කළ webhook අන්ත ලක්ෂ්‍යයේ අත්සන් රහස, මෙම සිදුවීම් සමඟ: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed. පරීක්ෂණ ප්‍රකාරයට පමණක් අදාළ වේ.',
                 ],
 
                 'order-settings' => [

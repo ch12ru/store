@@ -23,6 +23,11 @@ class RazorpayController extends Controller
     public const PAYMENT_CAPTURED = 'captured';
 
     /**
+     * The Razorpay payment states that count as money taken.
+     */
+    private const PAID_STATUSES = ['captured', 'authorized'];
+
+    /**
      * Create a new controller instance.
      */
     public function __construct(
@@ -45,6 +50,13 @@ class RazorpayController extends Controller
 
         try {
             $cart = Cart::getCart();
+
+            if (
+                $cart
+                && Cart::requiresSignInToCheckout()
+            ) {
+                return redirect()->route('shop.checkout.onepage.index');
+            }
 
             $currency = strtoupper($cart->base_currency_code ?? core()->getBaseCurrencyCode());
 
@@ -114,6 +126,18 @@ class RazorpayController extends Controller
             return redirect()->route('shop.checkout.cart.index');
         }
 
+        if (Cart::hasError()) {
+            session()->flash('error', trans('razorpay::app.response.something-went-wrong'));
+
+            return redirect()->route('shop.checkout.cart.index');
+        }
+
+        if (! $this->paymentCoversCart($request, $cart)) {
+            session()->flash('error', trans('razorpay::app.response.something-went-wrong'));
+
+            return redirect()->route('shop.checkout.cart.index');
+        }
+
         return $this->handlePaymentSuccess($request, $cart);
     }
 
@@ -125,6 +149,39 @@ class RazorpayController extends Controller
         session()->flash('error', trans('razorpay::app.response.payment.cancelled'));
 
         return redirect()->route('shop.checkout.cart.index');
+    }
+
+    /**
+     * Whether Razorpay holds a payment for this cart's amount that no order has used yet.
+     */
+    protected function paymentCoversCart(Request $request, $cart): bool
+    {
+        $paymentId = $request->input('razorpay_payment_id');
+
+        if (
+            ! $paymentId
+            || $this->orderTransactionRepository->findWhere(['transaction_id' => $paymentId])->isNotEmpty()
+        ) {
+            return false;
+        }
+
+        $payment = $this->razorpayPayment->fetchPayment($paymentId);
+
+        if (
+            ! $payment
+            || $payment['order_id'] !== $request->input('razorpay_order_id')
+            || ! in_array($payment['status'], self::PAID_STATUSES, true)
+        ) {
+            return false;
+        }
+
+        $currency = strtoupper($cart->base_currency_code ?? core()->getBaseCurrencyCode());
+
+        if (strtoupper((string) $payment['currency']) !== $currency) {
+            return false;
+        }
+
+        return $payment['amount'] === $this->razorpayPayment->getAmountInSubunits($cart);
     }
 
     /**

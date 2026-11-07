@@ -34,12 +34,27 @@ use Webkul\Tax\Models\TaxCategory;
 abstract class AbstractType
 {
     /**
+     * The largest upload a customer may attach to a file option, in bytes.
+     */
+    public const MAX_CUSTOMIZABLE_FILE_SIZE = 10485760;
+
+    /**
      * Extensions a customer's upload is never stored under, since a web server would run or render them as a page.
      */
     public const BLOCKED_UPLOAD_EXTENSIONS = [
         'asp', 'aspx', 'cgi', 'hta', 'htaccess', 'htm', 'html', 'js', 'jsp', 'mht', 'mhtml', 'mjs', 'pgif', 'phar',
         'php', 'php2', 'php3', 'php4', 'php5', 'php6', 'php7', 'php8', 'phps', 'pht', 'phtm', 'phtml', 'pl', 'py',
         'rdf', 'sh', 'shtm', 'shtml', 'stm', 'svg', 'svgz', 'swf', 'xht', 'xhtml', 'xml', 'xsl', 'xslt', 'xul',
+    ];
+
+    /**
+     * Content types a customer's upload is never stored with, whatever its extension, since a browser would render them.
+     */
+    public const BLOCKED_UPLOAD_MIME_TYPES = [
+        'application/ecmascript', 'application/javascript', 'application/rdf+xml', 'application/vnd.adobe.flash.movie',
+        'application/vnd.mozilla.xul+xml', 'application/x-httpd-php', 'application/x-php', 'application/x-shockwave-flash',
+        'application/xhtml+xml', 'application/xml', 'application/xslt+xml', 'image/svg', 'image/svg+xml',
+        'text/ecmascript', 'text/html', 'text/javascript', 'text/x-php', 'text/xml', 'text/xsl',
     ];
 
     /**
@@ -920,7 +935,12 @@ abstract class AbstractType
     {
         $price = $this->getCustomerGroupPrice($this->product, $customerGroupPrice->qty);
 
-        $discount = number_format((($this->product->price - $price) * 100) / ($this->product->price), 2);
+        $discount = number_format(
+            $this->product->price > 0
+                ? (($this->product->price - $price) * 100) / $this->product->price
+                : 0,
+            2
+        );
 
         $offerLines = trans('product::app.type.abstract.offers', [
             'qty' => $customerGroupPrice->qty,
@@ -1125,8 +1145,8 @@ abstract class AbstractType
     }
 
     /**
-     * Whether a customer's upload for a file option carries an extension the option accepts and that is never
-     * served as active content.
+     * Whether a customer's upload for a file option carries an extension the option accepts, with neither that
+     * extension nor the file's contents ever served as active content.
      */
     protected function isCustomizableFileAllowed(UploadedFile $file, array $supportedExtensions): bool
     {
@@ -1135,6 +1155,8 @@ abstract class AbstractType
         if (
             ! preg_match('/^[a-z0-9]{1,10}$/', $extension)
             || in_array($extension, self::BLOCKED_UPLOAD_EXTENSIONS)
+            || in_array(strtolower((string) $file->getMimeType()), self::BLOCKED_UPLOAD_MIME_TYPES)
+            || $file->getSize() > self::MAX_CUSTOMIZABLE_FILE_SIZE
         ) {
             return false;
         }

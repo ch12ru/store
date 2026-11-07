@@ -7,23 +7,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Event;
 use Webkul\MagicAI\Facades\MagicAI;
 use Webkul\Product\Repositories\ProductRepository;
-use Webkul\Product\Repositories\ProductReviewAttachmentRepository;
 use Webkul\Product\Repositories\ProductReviewRepository;
 use Webkul\Shop\Http\Resources\ProductReviewResource;
 
 class ReviewController extends APIController
 {
-    /**
-     * Create a controller instance.
-     *
-     * @return void
-     */
-    public function __construct(
-        protected ProductRepository $productRepository,
-        protected ProductReviewRepository $productReviewRepository,
-        protected ProductReviewAttachmentRepository $productReviewAttachmentRepository
-    ) {}
-
     /**
      * Pending review status.
      */
@@ -33,6 +21,16 @@ class ReviewController extends APIController
      * Approved review status.
      */
     const STATUS_APPROVED = 'approved';
+
+    /**
+     * Create a controller instance.
+     *
+     * @return void
+     */
+    public function __construct(
+        protected ProductRepository $productRepository,
+        protected ProductReviewRepository $productReviewRepository
+    ) {}
 
     /**
      * Product listings.
@@ -61,12 +59,22 @@ class ReviewController extends APIController
      */
     public function store(int $id): JsonResource
     {
+        if (
+            ! auth()->guard('customer')->check()
+            && ! core()->getConfigData('catalog.products.review.guest_review')
+        ) {
+            abort(403, trans('shop::app.errors.403.title'));
+        }
+
+        $this->productRepository->findOrFail($id);
+
         $this->validate(request(), [
-            'title' => 'required',
-            'comment' => 'required',
+            'title' => 'required|string|max:255',
+            'comment' => 'required|string|max:5000',
+            'name' => [auth()->guard('customer')->check() ? 'nullable' : 'required', 'string', 'max:255'],
             'rating' => 'required|numeric|min:1|max:5',
-            'attachments' => 'array',
-            'attachments.*' => 'file|mimetypes:image/*,video/*',
+            'attachments' => 'array|max:5',
+            'attachments.*' => 'file|mimetypes:image/*,video/*|max:10240',
         ]);
 
         $data = array_merge(request()->only([
@@ -84,9 +92,7 @@ class ReviewController extends APIController
 
         Event::dispatch('customer.review.create.before', $id);
 
-        $review = $this->productReviewRepository->create($data);
-
-        $this->productReviewAttachmentRepository->upload($data['attachments'], $review);
+        $review = $this->productReviewRepository->createWithAttachments($data);
 
         Event::dispatch('customer.review.create.after', $review);
 

@@ -61,6 +61,8 @@ it('redirects to cart when the cart currency is not accepted', function () {
 
     Cart::shouldReceive('getCart')->andReturn($cart);
 
+    Cart::shouldReceive('requiresSignInToCheckout')->andReturn(false);
+
     $this->payGlocalMock->shouldReceive('isCurrencySupported')->andReturn(false);
 
     // Act
@@ -91,6 +93,8 @@ it('sends the customer to payglocal without recording anything of its own', func
 
     Cart::shouldReceive('getCart')->andReturn($cart);
 
+    Cart::shouldReceive('requiresSignInToCheckout')->andReturn(false);
+
     $this->payGlocalMock->shouldReceive('initiatePayment')
         ->andReturn([
             'gid' => 'gl_o-test_gid',
@@ -109,6 +113,8 @@ it('reports a failure when payglocal will not start the payment', function () {
     $cart = $this->createCartWithItems('payglocal');
 
     Cart::shouldReceive('getCart')->andReturn($cart);
+
+    Cart::shouldReceive('requiresSignInToCheckout')->andReturn(false);
 
     $this->payGlocalMock->shouldReceive('initiatePayment')->andReturn(null);
 
@@ -213,6 +219,40 @@ it('believes payglocal over the token when the two disagree', function () {
     expect(Order::where('cart_id', $cart->id)->first())->toBeNull();
 });
 
+it('places no order when the gateway cannot be reached to confirm the payment', function () {
+    // Arrange
+    $cart = $this->createCartWithItems('payglocal');
+
+    mockCallbackToken(callbackClaims($cart));
+
+    $this->payGlocalMock->shouldReceive('getTransactionStatus')->andReturn(null);
+
+    // Act
+    $this->post(route('payglocal.callback'), ['x-gl-token' => 'token']);
+
+    // Assert
+    expect(Order::where('cart_id', $cart->id)->first())->toBeNull();
+});
+
+it('places no order when the token carries no status url to confirm against', function () {
+    // Arrange
+    $cart = $this->createCartWithItems('payglocal');
+
+    $claims = callbackClaims($cart);
+
+    unset($claims['statusUrl']);
+
+    mockCallbackToken($claims);
+
+    $this->payGlocalMock->shouldNotReceive('getTransactionStatus');
+
+    // Act
+    $this->post(route('payglocal.callback'), ['x-gl-token' => 'token']);
+
+    // Assert
+    expect(Order::where('cart_id', $cart->id)->first())->toBeNull();
+});
+
 it('shows the customer the order the callback placed', function () {
     // Arrange
     $cart = $this->createCartWithItems('payglocal');
@@ -307,6 +347,26 @@ it('ignores a webhook whose token is not signed by payglocal', function () {
     expect(Order::where('cart_id', $cart->id)->first())->toBeNull();
 });
 
+it('asks payglocal to retry the webhook when the gateway cannot be reached', function () {
+    // Arrange
+    $cart = $this->createCartWithItems('payglocal');
+
+    mockCallbackToken(callbackClaims($cart));
+
+    $this->payGlocalMock->shouldReceive('getTransactionStatus')->andReturn(null);
+
+    // Act
+    $response = $this->postJson(route('payglocal.webhook'), ['x-gl-token' => 'token']);
+
+    // Assert
+    // Not acknowledged, so that PayGlocal redelivers once its status call answers again.
+    $response->assertStatus(500);
+
+    $response->assertJsonPath('status', 'error');
+
+    expect(Order::where('cart_id', $cart->id)->first())->toBeNull();
+});
+
 it('refuses to place the order when the cart no longer totals what was captured', function () {
     // Arrange
     $cart = $this->createCartWithItems('payglocal');
@@ -322,6 +382,25 @@ it('refuses to place the order when the cart no longer totals what was captured'
 
     // Assert
     // Acknowledged, so that PayGlocal stops redelivering something retrying cannot fix.
+    $response->assertOk();
+
+    $response->assertJsonPath('status', 'payment_not_confirmed');
+
+    expect(Order::where('cart_id', $cart->id)->first())->toBeNull();
+});
+
+it('refuses to place the order when payglocal reports no amount at all', function () {
+    // Arrange
+    $cart = $this->createCartWithItems('payglocal');
+
+    mockCallbackToken(callbackClaims($cart));
+
+    mockConfirmedStatus($this->payGlocalMock, $cart, ['Amount' => null]);
+
+    // Act
+    $response = $this->postJson(route('payglocal.webhook'), ['x-gl-token' => 'token']);
+
+    // Assert
     $response->assertOk();
 
     $response->assertJsonPath('status', 'payment_not_confirmed');

@@ -1291,6 +1291,7 @@ return [
                                 'price' => 'Precio',
                                 'save-btn' => 'Guardar',
                                 'supported-file-extensions' => 'Extensiones de archivo admitidas',
+                                'supported-file-extensions-info' => 'Separa las extensiones con comas, por ejemplo jpg, png, pdf. Las páginas web, las imágenes SVG, los archivos XML y los scripts nunca se aceptan, aunque figuren aquí.',
                                 'title' => 'Opción',
                                 'type' => 'Tipo',
                                 'yes' => 'Sí',
@@ -5223,6 +5224,10 @@ return [
                     'test-client-secret' => 'Clave secreta del cliente en modo de prueba',
                     'test-mode-info' => 'Solo para modo de prueba/entorno de pruebas.',
                     'title' => 'Título',
+                    'webhook-secret' => 'Secreto de firma del webhook',
+                    'webhook-secret-info' => 'El secreto de firma del webhook añadido en el panel de Stripe para la URL de tu tienda seguida de /stripe/webhook, con los eventos: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed. Solo en modo de producción.',
+                    'webhook-test-secret' => 'Secreto de firma del webhook de prueba',
+                    'webhook-test-secret-info' => 'El secreto de firma del webhook añadido en el panel de Stripe para la URL de tu tienda seguida de /stripe/webhook, con los eventos: checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded, charge.dispute.created, charge.dispute.closed. Solo en modo de prueba.',
                 ],
 
                 'order-settings' => [
